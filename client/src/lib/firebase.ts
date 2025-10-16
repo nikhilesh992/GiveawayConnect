@@ -1,6 +1,7 @@
 // Firebase configuration based on firebase_barebones_javascript blueprint
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Check if Firebase is properly configured
 const hasValidConfig = import.meta.env.VITE_FIREBASE_API_KEY && 
@@ -17,14 +18,16 @@ const firebaseConfig = {
 
 let app: any;
 let auth: any;
+let db: any;
 let googleProvider: any;
 
 try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
+  db = getFirestore(app);
   googleProvider = new GoogleAuthProvider();
 } catch (error) {
   console.warn("Firebase initialization failed. Please configure Firebase credentials in Admin Settings.");
 }
 
-export { app, auth, googleProvider, hasValidConfig };
+export { app, auth, db, googleProvider, hasValidConfig };

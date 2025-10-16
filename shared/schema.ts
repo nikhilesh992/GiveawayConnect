@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   referredBy: text("referred_by"),
   isAnonymous: boolean("is_anonymous").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
+  role: integer("role").notNull().default(0), // 0 = user, 1 = admin
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
