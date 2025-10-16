@@ -78,7 +78,9 @@ export const referrals = pgTable("referrals", {
 // Donations
 export const donations = pgTable("donations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: text("user_id").notNull().references(() => users.id),
+  userId: text("user_id").references(() => users.id),
+  donorEmail: text("donor_email").notNull(),
+  donorName: text("donor_name").notNull(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: text("currency").notNull().default("INR"),
   paymentId: text("payment_id").notNull(),
@@ -181,6 +183,13 @@ export const insertReferralSchema = createInsertSchema(referrals).omit({
 export const insertDonationSchema = createInsertSchema(donations).omit({
   id: true,
   createdAt: true,
+}).extend({
+  amount: z.string().refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 1;
+  }, { message: "Minimum donation amount is 1 INR" }),
+  donorEmail: z.string().email("Please provide a valid Gmail address"),
+  donorName: z.string().min(1, "Name is required"),
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({
