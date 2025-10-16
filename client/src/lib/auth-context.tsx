@@ -11,6 +11,7 @@ import {
   updateProfile
 } from "firebase/auth";
 import { auth, googleProvider, hasValidConfig } from "./firebase";
+import { firestoreService } from "./firestore-service";
 import type { User } from "@shared/schema";
 
 interface AuthContextType {
@@ -49,20 +50,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFirebaseUser(firebaseUser);
         
         if (firebaseUser) {
-          // Fetch or create user in backend
           try {
-            const response = await fetch("/api/auth/user", {
-              headers: {
-                Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
-              },
-            });
+            let firestoreUser = await firestoreService.getUser(firebaseUser.uid);
             
-            if (response.ok) {
-              const userData = await response.json();
-              setUser(userData);
+            if (!firestoreUser) {
+              firestoreUser = await firestoreService.createUser({
+                firebaseUid: firebaseUser.uid,
+                email: firebaseUser.email || "",
+                displayName: firebaseUser.displayName || "Anonymous",
+                photoURL: firebaseUser.photoURL || undefined,
+                isAnonymous: firebaseUser.isAnonymous,
+              });
             }
+            
+            const userData: User = {
+              id: firestoreUser.id,
+              firebaseUid: firestoreUser.firebaseUid,
+              email: firestoreUser.email,
+              displayName: firestoreUser.displayName,
+              photoURL: firestoreUser.photoURL || null,
+              points: firestoreUser.points,
+              referralCode: firestoreUser.referralCode,
+              referredBy: firestoreUser.referredBy || null,
+              isAnonymous: firestoreUser.isAnonymous,
+              isAdmin: firestoreUser.role === 1,
+              role: firestoreUser.role,
+              createdAt: firestoreUser.createdAt,
+            };
+            
+            setUser(userData);
           } catch (error) {
-            console.error("Error fetching user:", error);
+            console.error("Error fetching/creating user in Firestore:", error);
           }
         } else {
           setUser(null);
