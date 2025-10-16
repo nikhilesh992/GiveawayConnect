@@ -1,5 +1,15 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { User as FirebaseUser, onAuthStateChanged, signInWithRedirect, signOut as firebaseSignOut, getRedirectResult } from "firebase/auth";
+import { 
+  User as FirebaseUser, 
+  onAuthStateChanged, 
+  signInWithRedirect, 
+  signOut as firebaseSignOut, 
+  getRedirectResult,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInAnonymously,
+  updateProfile
+} from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
 import type { User } from "@shared/schema";
 
@@ -8,6 +18,9 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, displayName: string) => Promise<void>;
+  signInAsGuest: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -57,13 +70,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signInWithRedirect(auth, googleProvider);
   };
 
+  const signInWithEmail = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const signUpWithEmail = async (email: string, password: string, displayName: string) => {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName });
+  };
+
+  const signInAsGuest = async () => {
+    await signInAnonymously(auth);
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ firebaseUser, user, loading, signInWithGoogle, signOut }}>
+    <AuthContext.Provider value={{ 
+      firebaseUser, 
+      user, 
+      loading, 
+      signInWithGoogle, 
+      signInWithEmail,
+      signUpWithEmail,
+      signInAsGuest,
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );
