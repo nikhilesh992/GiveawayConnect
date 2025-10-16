@@ -341,21 +341,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========== Donation Routes ==========
-  app.post("/api/donations", authMiddleware, async (req: AuthRequest, res) => {
+  app.post("/api/donations", optionalAuth, async (req: AuthRequest, res) => {
     try {
-      const user = await storage.getUserByFirebaseUid(req.user!.uid);
-      if (!user) return res.status(404).json({ error: "User not found" });
+      const { amount, isAnonymous, message, donorEmail, donorName } = req.body;
 
-      const { amount, isAnonymous, message } = req.body;
+      let user = null;
+      if (req.user) {
+        user = await storage.getUserByFirebaseUid(req.user.uid);
+      }
 
-      // In production, integrate with PayUMoney here
+      if (parseFloat(amount) < 1) {
+        return res.status(400).json({ error: "Minimum donation amount is 1 INR" });
+      }
+
+      if (!donorEmail || !donorName) {
+        return res.status(400).json({ error: "Email and name are required" });
+      }
+
+      // In production, integrate with PayU here
       const donation = await storage.createDonation({
-        userId: user.id,
+        userId: user?.id || null,
+        donorEmail,
+        donorName,
         amount: amount.toString(),
         currency: "INR",
         paymentId: `PAY_${Date.now()}`,
         paymentStatus: "success", // Mock success
-        isAnonymous,
+        isAnonymous: isAnonymous || false,
         message: message || null,
       });
 

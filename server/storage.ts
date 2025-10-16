@@ -441,32 +441,31 @@ export class MemStorage implements IStorage {
       donations = donations.filter((d) => new Date(d.createdAt) >= monthStart);
     }
 
-    const userDonations = new Map<string, { total: number; count: number }>();
+    const donorMap = new Map<string, { total: number; count: number; donation: Donation }>();
     
     donations.forEach((d) => {
-      const existing = userDonations.get(d.userId) || { total: 0, count: 0 };
-      userDonations.set(d.userId, {
+      const key = d.userId || d.donorEmail;
+      const existing = donorMap.get(key) || { total: 0, count: 0, donation: d };
+      donorMap.set(key, {
         total: existing.total + parseFloat(d.amount.toString()),
         count: existing.count + 1,
+        donation: d,
       });
     });
 
-    return Array.from(userDonations.entries())
-      .map(([userId, data]) => {
-        const user = this.users.get(userId);
-        const donation = donations.find((d) => d.userId === userId);
-        if (!user || !donation) return null;
-
+    return Array.from(donorMap.entries())
+      .map(([key, data]) => {
+        const user = data.donation.userId ? this.users.get(data.donation.userId) : null;
+        
         return {
-          userId,
-          displayName: user.displayName,
-          photoURL: user.photoURL || undefined,
-          isAnonymous: donation.isAnonymous,
+          userId: data.donation.userId || key,
+          displayName: user ? user.displayName : data.donation.donorName,
+          photoURL: user?.photoURL || undefined,
+          isAnonymous: data.donation.isAnonymous,
           totalAmount: data.total,
           donationCount: data.count,
         };
       })
-      .filter((e): e is DonorLeaderboardEntry => e !== null)
       .sort((a, b) => b.totalAmount - a.totalAmount);
   }
 
