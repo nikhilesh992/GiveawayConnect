@@ -96,7 +96,7 @@ async function adminMiddleware(req: AuthRequest, res: Response, next: NextFuncti
 
 // Winner selection algorithm
 function calculateWinningProbabilities(
-  entries: Array<{ userId: string; points: number; referrals: number }>,
+  entries: Array<{ userId: string; points: number; referrals: number; entryId: string }>,
   config: any
 ) {
   const { base, P, alpha, beta, Rcap, Tmax, ratioCap, epsilon } = config;
@@ -129,9 +129,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!user) {
         // Create new user
-        // Note: Admin access must be granted manually through database
-        // Only specific email domain gets automatic admin access
-        const isAdminEmail = req.user!.email.endsWith('@giveawayconnect.com');
+        // Admin access granted to specific emails and domain
+        const isAdminEmail = req.user!.email.endsWith('@giveawayconnect.com') || 
+                            req.user!.email === 'pattnaiknikhilesh@gmail.com';
         
         user = await storage.createUser({
           firebaseUid: req.user!.uid,

@@ -109,8 +109,15 @@ export const settings = pgTable("settings", {
     fromName: string;
     fromEmail: string;
   }>(),
+  firebaseConfig: jsonb("firebase_config").$type<{
+    apiKey: string;
+    projectId: string;
+    appId: string;
+  }>(),
   payuConfig: jsonb("payu_config").$type<{
     merchantId: string;
+    merchantKey: string;
+    merchantSalt: string;
     environment: string;
   }>(),
   siteConfig: jsonb("site_config").$type<{

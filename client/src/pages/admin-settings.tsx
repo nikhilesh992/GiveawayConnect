@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
-import { Save, Settings as SettingsIcon } from "lucide-react";
+import { Save, Settings as SettingsIcon, Key, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Settings } from "@shared/schema";
@@ -22,6 +24,29 @@ export default function AdminSettings() {
   });
 
   const [allowedDomains, setAllowedDomains] = useState("");
+  
+  const [firebaseApiKey, setFirebaseApiKey] = useState("");
+  const [firebaseProjectId, setFirebaseProjectId] = useState("");
+  const [firebaseAppId, setFirebaseAppId] = useState("");
+  
+  const [payuMerchantId, setPayuMerchantId] = useState("");
+  const [payuMerchantKey, setPayuMerchantKey] = useState("");
+  const [payuMerchantSalt, setPayuMerchantSalt] = useState("");
+  const [payuEnvironment, setPayuEnvironment] = useState("test");
+
+  useEffect(() => {
+    if (settings?.firebaseConfig) {
+      setFirebaseApiKey(settings.firebaseConfig.apiKey || "");
+      setFirebaseProjectId(settings.firebaseConfig.projectId || "");
+      setFirebaseAppId(settings.firebaseConfig.appId || "");
+    }
+    if (settings?.payuConfig) {
+      setPayuMerchantId(settings.payuConfig.merchantId || "");
+      setPayuMerchantKey(settings.payuConfig.merchantKey || "");
+      setPayuMerchantSalt(settings.payuConfig.merchantSalt || "");
+      setPayuEnvironment(settings.payuConfig.environment || "test");
+    }
+  }, [settings]);
 
   const updateMutation = useMutation({
     mutationFn: (data: Partial<Settings>) =>
@@ -51,6 +76,45 @@ export default function AdminSettings() {
     });
   };
 
+  const handleSaveFirebase = () => {
+    if (!firebaseApiKey || !firebaseProjectId || !firebaseAppId) {
+      toast({
+        title: "Error",
+        description: "All Firebase fields are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateMutation.mutate({
+      firebaseConfig: {
+        apiKey: firebaseApiKey,
+        projectId: firebaseProjectId,
+        appId: firebaseAppId,
+      },
+    });
+  };
+
+  const handleSavePayU = () => {
+    if (!payuMerchantId || !payuMerchantKey || !payuMerchantSalt) {
+      toast({
+        title: "Error",
+        description: "All PayU fields are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updateMutation.mutate({
+      payuConfig: {
+        merchantId: payuMerchantId,
+        merchantKey: payuMerchantKey,
+        merchantSalt: payuMerchantSalt,
+        environment: payuEnvironment,
+      },
+    });
+  };
+
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -62,6 +126,137 @@ export default function AdminSettings() {
         </div>
 
         <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Key className="h-5 w-5" />
+                Firebase Configuration
+              </CardTitle>
+              <CardDescription>
+                Configure Firebase authentication settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="firebase-api-key">Firebase API Key</Label>
+                <Input
+                  id="firebase-api-key"
+                  type="text"
+                  placeholder="AIzaSy..."
+                  value={firebaseApiKey}
+                  onChange={(e) => setFirebaseApiKey(e.target.value)}
+                  data-testid="input-firebase-api-key"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="firebase-project-id">Firebase Project ID</Label>
+                <Input
+                  id="firebase-project-id"
+                  type="text"
+                  placeholder="my-project-123"
+                  value={firebaseProjectId}
+                  onChange={(e) => setFirebaseProjectId(e.target.value)}
+                  data-testid="input-firebase-project-id"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="firebase-app-id">Firebase App ID</Label>
+                <Input
+                  id="firebase-app-id"
+                  type="text"
+                  placeholder="1:123456789:web:..."
+                  value={firebaseAppId}
+                  onChange={(e) => setFirebaseAppId(e.target.value)}
+                  data-testid="input-firebase-app-id"
+                />
+              </div>
+
+              <Button
+                onClick={handleSaveFirebase}
+                disabled={updateMutation.isPending}
+                className="hover-elevate active-elevate-2"
+                data-testid="button-save-firebase"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {updateMutation.isPending ? "Saving..." : "Save Firebase Config"}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                PayU Configuration
+              </CardTitle>
+              <CardDescription>
+                Configure PayU payment gateway settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="payu-merchant-id">Merchant ID</Label>
+                <Input
+                  id="payu-merchant-id"
+                  type="text"
+                  placeholder="Enter PayU Merchant ID"
+                  value={payuMerchantId}
+                  onChange={(e) => setPayuMerchantId(e.target.value)}
+                  data-testid="input-payu-merchant-id"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="payu-merchant-key">Merchant Key</Label>
+                <Input
+                  id="payu-merchant-key"
+                  type="text"
+                  placeholder="Enter PayU Merchant Key"
+                  value={payuMerchantKey}
+                  onChange={(e) => setPayuMerchantKey(e.target.value)}
+                  data-testid="input-payu-merchant-key"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="payu-merchant-salt">Merchant Salt</Label>
+                <Input
+                  id="payu-merchant-salt"
+                  type="text"
+                  placeholder="Enter PayU Merchant Salt"
+                  value={payuMerchantSalt}
+                  onChange={(e) => setPayuMerchantSalt(e.target.value)}
+                  data-testid="input-payu-merchant-salt"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="payu-environment">Environment</Label>
+                <Select value={payuEnvironment} onValueChange={setPayuEnvironment}>
+                  <SelectTrigger id="payu-environment" data-testid="select-payu-environment">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="test">Test</SelectItem>
+                    <SelectItem value="production">Production</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                onClick={handleSavePayU}
+                disabled={updateMutation.isPending}
+                className="hover-elevate active-elevate-2"
+                data-testid="button-save-payu"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {updateMutation.isPending ? "Saving..." : "Save PayU Config"}
+              </Button>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
