@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { useLocation } from "wouter";
@@ -28,8 +29,13 @@ export default function AdminDashboard() {
     enabled: !!user?.isAdmin,
   });
 
+  useEffect(() => {
+    if (user && !user.isAdmin) {
+      setLocation("/");
+    }
+  }, [user, setLocation]);
+
   if (!user?.isAdmin) {
-    setLocation("/");
     return null;
   }
 
