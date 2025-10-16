@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { createHash } from "crypto";
 import { storage } from "./storage";
+import { serverFirestoreService } from "./firestore-service";
 
 // Interface for authenticated requests
 interface AuthRequest extends Request {
@@ -87,8 +88,8 @@ async function adminMiddleware(req: AuthRequest, res: Response, next: NextFuncti
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const user = await storage.getUserByFirebaseUid(req.user.uid);
-  if (!user?.isAdmin) {
+  const user = await serverFirestoreService.getUser(req.user.uid);
+  if (!user || user.role !== 1) {
     return res.status(403).json({ error: "Forbidden: Admin access required" });
   }
 
@@ -185,24 +186,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== Authentication Routes ==========
   app.get("/api/auth/user", authMiddleware, async (req: AuthRequest, res) => {
     try {
-      let user = await storage.getUserByFirebaseUid(req.user!.uid);
+      let user = await serverFirestoreService.getUser(req.user!.uid);
 
       if (!user) {
-        // Create new user
-        // Admin access granted to specific emails and domain
         const isAdminEmail = req.user!.email.endsWith('@giveawayconnect.com') || 
                             req.user!.email === 'pattnaiknikhilesh@gmail.com';
         
-        user = await storage.createUser({
+        user = await serverFirestoreService.createUser({
           firebaseUid: req.user!.uid,
           email: req.user!.email,
           displayName: req.user!.name,
           photoURL: req.user?.picture,
-          isAdmin: isAdminEmail,
+          isAnonymous: false,
+          role: isAdminEmail ? 1 : 0,
         });
       }
 
-      res.json(user);
+      if (!user) {
+        return res.status(500).json({ error: "Failed to create user" });
+      }
+
+      const responseUser = {
+        id: user.id,
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL || null,
+        points: user.points,
+        referralCode: user.referralCode,
+        referredBy: user.referredBy || null,
+        isAnonymous: user.isAnonymous,
+        isAdmin: user.role === 1,
+        role: user.role,
+        createdAt: user.createdAt,
+      };
+
+      res.json(responseUser);
     } catch (error) {
       res.status(500).json({ error: "Failed to get user" });
     }
@@ -281,22 +300,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const { giveawayId } = req.body;
-      const user = await storage.getUserByFirebaseUid(req.user!.uid);
-      if (!user) return res.status(404).json({ error: "User not found" });
+      const firestoreUser = await serverFirestoreService.getUser(req.user!.uid);
+      if (!firestoreUser) return res.status(404).json({ error: "User not found" });
 
       const task = await storage.getTask(id);
       if (!task) return res.status(404).json({ error: "Task not found" });
 
-      const existing = await storage.getTaskCompletion(user.id, id);
+      const existing = await storage.getTaskCompletion(firestoreUser.id, id);
       if (existing) return res.status(400).json({ error: "Task already completed" });
 
       await storage.createTaskCompletion({
-        userId: user.id,
+        userId: firestoreUser.id,
         taskId: id,
         giveawayId: giveawayId,
       });
 
-      await storage.updateUser(user.id, { points: user.points + task.points });
+      await serverFirestoreService.updateUserPoints(req.user!.uid, task.points);
 
       // Recalculate probabilities
       const entries = await storage.getGiveawayEntries(giveawayId);
@@ -304,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const usersWithStats = await Promise.all(
         entries.map(async (entry) => {
-          const u = await storage.getUser(entry.userId);
+          const u = await serverFirestoreService.getUser(entry.userId);
           const referrals = await storage.getReferralsByReferrer(entry.userId);
           return {
             userId: entry.userId,
@@ -590,7 +609,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ========== Admin Routes ==========
   app.get("/api/admin/stats", authMiddleware, adminMiddleware, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const users = await serverFirestoreService.getAllUsers();
       const giveaways = await storage.getAllGiveaways();
       const donations = await storage.getAllDonations();
       const winners = await storage.getWinners();
@@ -668,7 +687,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/admin/users", authMiddleware, adminMiddleware, async (req, res) => {
     try {
-      const users = await storage.getAllUsers();
+      const firestoreUsers = await serverFirestoreService.getAllUsers();
+      const users = firestoreUsers.map(u => ({
+        id: u.id,
+        firebaseUid: u.firebaseUid,
+        email: u.email,
+        displayName: u.displayName,
+        photoURL: u.photoURL || null,
+        points: u.points,
+        referralCode: u.referralCode,
+        referredBy: u.referredBy || null,
+        isAnonymous: u.isAnonymous,
+        isAdmin: u.role === 1,
+        role: u.role,
+        createdAt: u.createdAt,
+      }));
       res.json(users);
     } catch (error) {
       res.status(500).json({ error: "Failed to get users" });
@@ -680,7 +713,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const donations = await storage.getAllDonations();
       const withUsers = await Promise.all(
         donations.map(async (d) => {
-          const user = await storage.getUser(d.userId);
+          const user = d.userId ? await storage.getUser(d.userId) : null;
           return { ...d, user };
         })
       );

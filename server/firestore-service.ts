@@ -101,4 +101,19 @@ export const serverFirestoreService = {
     
     await updateDoc(doc(db, "users", firebaseUid), { role });
   },
+
+  async getAllUsers(): Promise<FirestoreUser[]> {
+    if (!db) return [];
+    
+    const { collection, getDocs } = await import("firebase/firestore");
+    const usersSnapshot = await getDocs(collection(db, "users"));
+    
+    return usersSnapshot.docs.map(doc => {
+      const data = doc.data() as FirestoreUser;
+      return {
+        ...data,
+        createdAt: data.createdAt?.toDate?.() || data.createdAt,
+      };
+    });
+  },
 };
