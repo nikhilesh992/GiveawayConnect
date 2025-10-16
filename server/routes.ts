@@ -1,5 +1,6 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import { createHash } from "crypto";
 import { storage } from "./storage";
 
 // Interface for authenticated requests
@@ -92,6 +93,65 @@ async function adminMiddleware(req: AuthRequest, res: Response, next: NextFuncti
   }
 
   next();
+}
+
+// PayU payment hash generation
+function generatePayUHash(
+  key: string,
+  txnid: string,
+  amount: string,
+  productinfo: string,
+  firstname: string,
+  email: string,
+  salt: string
+): string {
+  const hashString = `${key}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${salt}`;
+  return createHash('sha512').update(hashString).digest('hex');
+}
+
+// PayU payment URL generation
+function generatePayUPaymentUrl(
+  config: any,
+  donation: { id: string; amount: string; donorName: string; donorEmail: string; message?: string | null }
+): string {
+  const { merchantId, merchantKey, merchantSalt, environment } = config;
+  const baseUrl = environment === 'production' 
+    ? 'https://secure.payu.in/_payment'
+    : 'https://test.payu.in/_payment';
+
+  const txnid = `TXN_${donation.id}`;
+  const amount = parseFloat(donation.amount).toFixed(2);
+  const productinfo = donation.message || 'Community Support Donation';
+  const firstname = donation.donorName.split(' ')[0];
+  const email = donation.donorEmail;
+
+  const hash = generatePayUHash(
+    merchantKey,
+    txnid,
+    amount,
+    productinfo,
+    firstname,
+    email,
+    merchantSalt
+  );
+
+  const successUrl = `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/api/donations/payu/success`;
+  const failureUrl = `${process.env.REPLIT_DEV_DOMAIN || 'http://localhost:5000'}/api/donations/payu/failure`;
+
+  const params = new URLSearchParams({
+    key: merchantKey,
+    txnid,
+    amount,
+    productinfo,
+    firstname,
+    email,
+    phone: '',
+    surl: successUrl,
+    furl: failureUrl,
+    hash,
+  });
+
+  return `${baseUrl}?${params.toString()}`;
 }
 
 // Winner selection algorithm
@@ -358,21 +418,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Email and name are required" });
       }
 
-      // In production, integrate with PayU here
+      // Create donation record with pending status
       const donation = await storage.createDonation({
         userId: user?.id || null,
         donorEmail,
         donorName,
         amount: amount.toString(),
         currency: "INR",
-        paymentId: `PAY_${Date.now()}`,
-        paymentStatus: "success", // Mock success
+        paymentId: `PENDING_${Date.now()}`,
+        paymentStatus: "pending",
         isAnonymous: isAnonymous || false,
         message: message || null,
       });
 
-      res.json({ success: true, donation });
+      // Get PayU configuration from settings
+      const settings = await storage.getSettings();
+      
+      if (settings?.payuConfig) {
+        // Generate PayU payment URL
+        const paymentUrl = generatePayUPaymentUrl(settings.payuConfig, {
+          id: donation.id,
+          amount: donation.amount,
+          donorName: donation.donorName,
+          donorEmail: donation.donorEmail,
+          message: donation.message,
+        });
+
+        res.json({ success: true, paymentUrl, donation });
+      } else {
+        // PayU not configured, mock success for development
+        await storage.updateDonation(donation.id, {
+          paymentId: `DEV_${Date.now()}`,
+          paymentStatus: "success",
+        });
+        res.json({ success: true, donation });
+      }
     } catch (error) {
+      console.error("Donation error:", error);
       res.status(500).json({ error: "Failed to process donation" });
     }
   });
@@ -384,6 +466,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(leaderboard);
     } catch (error) {
       res.status(500).json({ error: "Failed to get donor leaderboard" });
+    }
+  });
+
+  // PayU callback routes
+  app.post("/api/donations/payu/success", async (req, res) => {
+    try {
+      const { txnid, mihpayid, status, amount, firstname, email, productinfo, hash } = req.body;
+      
+      // Get PayU configuration to verify hash
+      const settings = await storage.getSettings();
+      if (!settings?.payuConfig) {
+        console.error("PayU configuration not found");
+        return res.redirect('/support?payment=error');
+      }
+
+      // Verify PayU hash for security (PayU reverse hash format)
+      const { merchantKey, merchantSalt } = settings.payuConfig;
+      const hashString = `${merchantSalt}|${status}|||||||||||${email}|${firstname}|${productinfo}|${amount}|${txnid}|${merchantKey}`;
+      const expectedHash = createHash('sha512').update(hashString).digest('hex');
+      
+      if (hash !== expectedHash) {
+        console.error("Invalid PayU hash - possible forgery attempt");
+        console.error("Expected:", expectedHash, "Received:", hash);
+        return res.redirect('/support?payment=error');
+      }
+
+      // Verify donation exists and matches
+      const donationId = txnid.replace('TXN_', '');
+      const donation = await storage.getDonation(donationId);
+      
+      if (!donation) {
+        console.error("Donation not found for txnid:", txnid);
+        return res.redirect('/support?payment=error');
+      }
+
+      if (parseFloat(donation.amount) !== parseFloat(amount)) {
+        console.error("Amount mismatch - donation:", donation.amount, "callback:", amount);
+        return res.redirect('/support?payment=error');
+      }
+      
+      if (status === "success") {
+        await storage.updateDonation(donationId, {
+          paymentId: mihpayid,
+          paymentStatus: "success",
+        });
+        
+        res.redirect('/support?payment=success');
+      } else {
+        await storage.updateDonation(donationId, {
+          paymentStatus: "failed",
+        });
+        res.redirect('/support?payment=failed');
+      }
+    } catch (error) {
+      console.error("PayU success callback error:", error);
+      res.redirect('/support?payment=error');
+    }
+  });
+
+  app.post("/api/donations/payu/failure", async (req, res) => {
+    try {
+      const { txnid, status, amount, firstname, email, productinfo, hash } = req.body;
+      
+      // Get PayU configuration to verify hash
+      const settings = await storage.getSettings();
+      if (!settings?.payuConfig) {
+        console.error("PayU configuration not found");
+        return res.redirect('/support?payment=error');
+      }
+
+      // Verify PayU hash for security (PayU reverse hash format)
+      const { merchantKey, merchantSalt } = settings.payuConfig;
+      const hashString = `${merchantSalt}|${status}|||||||||||${email}|${firstname}|${productinfo}|${amount}|${txnid}|${merchantKey}`;
+      const expectedHash = createHash('sha512').update(hashString).digest('hex');
+      
+      if (hash !== expectedHash) {
+        console.error("Invalid PayU hash on failure callback - possible forgery attempt");
+        console.error("Expected:", expectedHash, "Received:", hash);
+        return res.redirect('/support?payment=error');
+      }
+
+      // Verify donation exists
+      const donationId = txnid.replace('TXN_', '');
+      const donation = await storage.getDonation(donationId);
+      
+      if (!donation) {
+        console.error("Donation not found for txnid:", txnid);
+        return res.redirect('/support?payment=error');
+      }
+      
+      await storage.updateDonation(donationId, {
+        paymentStatus: "failed",
+      });
+      
+      res.redirect('/support?payment=failed');
+    } catch (error) {
+      console.error("PayU failure callback error:", error);
+      res.redirect('/support?payment=error');
     }
   });
 

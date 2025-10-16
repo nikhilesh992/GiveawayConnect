@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Heart, TrendingUp } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -12,6 +12,35 @@ import type { DonorLeaderboardEntry } from "@shared/schema";
 export default function Support() {
   const { user } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    
+    if (payment === 'success') {
+      toast({
+        title: "Payment Successful!",
+        description: "Thank you for your generous donation to the community!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/leaderboard/monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/donations/leaderboard/all-time"] });
+      window.history.replaceState({}, '', '/support');
+    } else if (payment === 'failed') {
+      toast({
+        title: "Payment Failed",
+        description: "Your payment was not processed. Please try again.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, '', '/support');
+    } else if (payment === 'error') {
+      toast({
+        title: "Payment Error",
+        description: "There was an error processing your payment. Please try again.",
+        variant: "destructive",
+      });
+      window.history.replaceState({}, '', '/support');
+    }
+  }, [toast]);
 
   const { data: monthlyDonors } = useQuery<DonorLeaderboardEntry[]>({
     queryKey: ["/api/donations/leaderboard/monthly"],
