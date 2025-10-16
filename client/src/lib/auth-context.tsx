@@ -10,7 +10,7 @@ import {
   signInAnonymously,
   updateProfile
 } from "firebase/auth";
-import { auth, googleProvider } from "./firebase";
+import { auth, googleProvider, hasValidConfig } from "./firebase";
 import type { User } from "@shared/schema";
 
 interface AuthContextType {
@@ -32,58 +32,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Handle redirect result on page load
-    getRedirectResult(auth).catch((error) => {
-      console.error("Redirect error:", error);
-    });
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setFirebaseUser(firebaseUser);
-      
-      if (firebaseUser) {
-        // Fetch or create user in backend
-        try {
-          const response = await fetch("/api/auth/user", {
-            headers: {
-              Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
-            },
-          });
-          
-          if (response.ok) {
-            const userData = await response.json();
-            setUser(userData);
-          }
-        } catch (error) {
-          console.error("Error fetching user:", error);
-        }
-      } else {
-        setUser(null);
-      }
-      
+    // If Firebase is not configured, just set loading to false
+    if (!hasValidConfig || !auth) {
+      console.warn("Firebase is not configured. Please add Firebase credentials to use authentication.");
       setLoading(false);
-    });
+      return;
+    }
 
-    return unsubscribe;
+    try {
+      // Handle redirect result on page load
+      getRedirectResult(auth).catch((error) => {
+        console.warn("Firebase redirect error:", error.message);
+      });
+
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        setFirebaseUser(firebaseUser);
+        
+        if (firebaseUser) {
+          // Fetch or create user in backend
+          try {
+            const response = await fetch("/api/auth/user", {
+              headers: {
+                Authorization: `Bearer ${await firebaseUser.getIdToken()}`,
+              },
+            });
+            
+            if (response.ok) {
+              const userData = await response.json();
+              setUser(userData);
+            }
+          } catch (error) {
+            console.error("Error fetching user:", error);
+          }
+        } else {
+          setUser(null);
+        }
+        
+        setLoading(false);
+      }, (error: any) => {
+        console.warn("Firebase auth error:", error.message);
+        setLoading(false);
+      });
+
+      return unsubscribe;
+    } catch (error) {
+      console.warn("Firebase initialization error:", error);
+      setLoading(false);
+    }
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!auth || !googleProvider) {
+      throw new Error("Firebase is not configured. Please configure Firebase in Admin Settings.");
+    }
     await signInWithRedirect(auth, googleProvider);
   };
 
   const signInWithEmail = async (email: string, password: string) => {
+    if (!auth) {
+      throw new Error("Firebase is not configured. Please configure Firebase in Admin Settings.");
+    }
     await signInWithEmailAndPassword(auth, email, password);
   };
 
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
+    if (!auth) {
+      throw new Error("Firebase is not configured. Please configure Firebase in Admin Settings.");
+    }
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName });
   };
 
   const signInAsGuest = async () => {
+    if (!auth) {
+      throw new Error("Firebase is not configured. Please configure Firebase in Admin Settings.");
+    }
     await signInAnonymously(auth);
   };
 
   const signOut = async () => {
+    if (!auth) {
+      return;
+    }
     await firebaseSignOut(auth);
     setUser(null);
   };

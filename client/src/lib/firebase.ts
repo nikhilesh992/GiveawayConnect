@@ -2,14 +2,29 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
+// Check if Firebase is properly configured
+const hasValidConfig = import.meta.env.VITE_FIREBASE_API_KEY && 
+                       import.meta.env.VITE_FIREBASE_PROJECT_ID && 
+                       import.meta.env.VITE_FIREBASE_APP_ID;
+
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDummy_Key_Please_Replace_In_Admin_Settings",
-  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID || "placeholder-project"}.firebaseapp.com`,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "placeholder-project",
-  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID || "placeholder-project"}.firebasestorage.app`,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:abcdef123456",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "demo-key",
+  authDomain: `${import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project"}.firebaseapp.com`,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project",
+  storageBucket: `${import.meta.env.VITE_FIREBASE_PROJECT_ID || "demo-project"}.firebasestorage.app`,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:0:web:0",
 };
 
-export const app = initializeApp(firebaseConfig);
-export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
+let app: any;
+let auth: any;
+let googleProvider: any;
+
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  googleProvider = new GoogleAuthProvider();
+} catch (error) {
+  console.warn("Firebase initialization failed. Please configure Firebase credentials in Admin Settings.");
+}
+
+export { app, auth, googleProvider, hasValidConfig };
