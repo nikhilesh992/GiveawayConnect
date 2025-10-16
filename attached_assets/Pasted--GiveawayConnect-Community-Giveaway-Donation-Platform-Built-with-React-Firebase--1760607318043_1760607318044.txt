@@ -1,0 +1,360 @@
+# 🎁 GiveawayConnect  
+### Community Giveaway & Donation Platform  
+Built with **React + Firebase + PayUMoney + Hostinger SMTP**
+
+---
+
+## 🚀 Overview
+
+GiveawayConnect is a web platform for hosting online giveaways, community participation, and donations.  
+Users can join giveaways, complete reward tasks, refer friends, and earn points for higher winning chances.  
+Donations are optional (via PayUMoney), and the admin can manage all data through a powerful dashboard.
+
+---
+
+## 🧩 Tech Stack
+
+**Frontend:** React + TypeScript + TailwindCSS + shadcn/ui  
+**Backend:** Firebase (Auth, Firestore, Functions, Storage, Analytics)  
+**Payments:** PayUMoney (INR)  
+**Email (OTP & Notifications):** Hostinger SMTP  
+**Hosting:** Hostinger (frontend) + Firebase Functions (backend)  
+**Analytics:** Google Analytics 4  
+
+---
+
+## 📁 Folder Structure
+
+giveawayconnect/
+├── src/
+│ ├── components/
+│ │ ├── giveaways/
+│ │ │ ├── GiveawayCard.tsx
+│ │ │ ├── GiveawayDetail.tsx
+│ │ ├── tasks/
+│ │ │ ├── TaskList.tsx
+│ │ │ ├── TaskItem.tsx
+│ │ ├── referrals/ReferralBox.tsx
+│ │ ├── leaderboard/Leaderboard.tsx
+│ │ ├── chat/ChatPanel.tsx
+│ │ ├── donations/
+│ │ │ ├── DonateForm.tsx
+│ │ │ ├── DonorLeaderboard.tsx
+│ │ ├── admin/
+│ │ ├── SettingsForm.tsx
+│ │ ├── GiveawaysTable.tsx
+│ │ ├── UsersTable.tsx
+│ │ ├── DonationsTable.tsx
+│ │ ├── AuditLogTable.tsx
+│ ├── lib/
+│ │ ├── firebase.ts # Firebase client setup
+│ │ ├── api.ts # Client calls to Firebase Functions
+│ │ ├── auth.ts # Auth helpers
+│ ├── pages/
+│ │ ├── index.tsx # Home
+│ │ ├── giveaways.tsx
+│ │ ├── g/[gid].tsx
+│ │ ├── winners.tsx
+│ │ ├── support.tsx
+│ │ ├── auth/login.tsx
+│ │ ├── auth/verify.tsx
+│ │ ├── me/index.tsx
+│ │ ├── me/profile.tsx
+│ │ ├── admin/... # All admin pages
+├── functions/ # Firebase Cloud Functions
+│ ├── index.js
+│ ├── package.json
+│ ├── utils/
+│ │ ├── email.js
+│ │ ├── payu.js
+│ │ ├── fairness.js
+├── public/
+├── .env.example
+├── tailwind.config.js
+├── vite.config.ts
+├── package.json
+└── README.md
+
+yaml
+Copy code
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1️⃣ Install dependencies
+
+```bash
+npm install
+or (if using yarn)
+
+bash
+Copy code
+yarn install
+2️⃣ Firebase Configuration
+Client SDK
+Your Firebase project:
+
+yaml
+Copy code
+Project name: GiveawayConnect
+Project ID: luck-by167u
+Project number: 716594488057
+Add Firebase SDK to your project:
+
+js
+Copy code
+// src/lib/firebase.ts
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getAnalytics, isSupported } from "firebase/analytics";
+
+const config = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+};
+
+const app = initializeApp(config);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const google = new GoogleAuthProvider();
+isSupported().then(s => s && getAnalytics(app));
+
+export { app, db, auth, google };
+3️⃣ Environment Variables
+Create a .env file in the project root (Replit + Hostinger env):
+
+env
+Copy code
+NEXT_PUBLIC_FIREBASE_API_KEY=AIzaSyBIjC4eIM_NVt-sTa6CmEPrvBZwJOHn0yI
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=luck-by167u.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=luck-by167u
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=luck-by167u.firebasestorage.app
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=716594488057
+NEXT_PUBLIC_FIREBASE_APP_ID=1:716594488057:web:bc5e4bbcc5ef376aa77828
+NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=G-XQ0H7DB19W
+NEXT_PUBLIC_BASE_URL=https://yourdomain.com
+
+FIREBASE_SERVICE_ACCOUNT_JSON_BASE64=<base64-of-service-account-json>
+
+PAYU_MERCHANT_ID=13141483
+PAYU_KEY=r5wyW4
+PAYU_SALT=XsJMT8oE5cCjrQFzclX5E7JY9EJ4Q1S9
+PAYU_SUCCESS_URL=https://yourdomain.com/support/success
+PAYU_FAILURE_URL=https://yourdomain.com/support/failure
+PAYU_ENV=prod
+
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=giveaways@luvrix.com
+SMTP_PASS=<your_password>
+SMTP_FROM_NAME=GiveawayConnect
+SMTP_FROM_EMAIL=giveaways@luvrix.com
+
+GA4_MEASUREMENT_ID=G-XQ0H7DB19W
+4️⃣ Firebase Functions
+In functions/index.js:
+
+js
+Copy code
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
+
+const serviceAccount = JSON.parse(
+  Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, "base64").toString("utf8")
+);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  projectId: "luck-by167u",
+});
+
+const db = admin.firestore();
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT),
+  secure: process.env.SMTP_SECURE === "true",
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+// Example: OTP Function
+exports.requestEmailOtp = functions.https.onCall(async (data, context) => {
+  const { email } = data;
+  const otp = Math.floor(100000 + Math.random() * 900000);
+  const mailOptions = {
+    from: `"GiveawayConnect" <${process.env.SMTP_FROM_EMAIL}>`,
+    to: email,
+    subject: "Your GiveawayConnect OTP Code",
+    text: `Your OTP code is: ${otp}`,
+  };
+  await transporter.sendMail(mailOptions);
+  return { success: true, message: "OTP sent!" };
+});
+Deploy functions:
+
+bash
+Copy code
+firebase deploy --only functions
+5️⃣ Firestore Rules
+Deploy with:
+
+bash
+Copy code
+firebase deploy --only firestore:rules
+Rules Outline:
+
+js
+Copy code
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /settings/{docId} { allow read: if true; allow write: if request.auth.token.admin == true; }
+    match /giveaways/{gid} {
+      allow read: if true;
+      allow write: if request.auth.token.admin == true;
+    }
+    match /users/{uid} {
+      allow read, update: if request.auth != null && request.auth.uid == uid;
+    }
+    match /donations/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
+🧠 Key Features
+✅ Google & Email OTP login (Firebase Auth + SMTP)
+✅ Domain allowlist for allowed emails (Admin-editable)
+✅ Join giveaways → Complete reward tasks → Earn points
+✅ Referral system (points for invites)
+✅ Weighted fairness winner system (auto/manual)
+✅ INR donations via PayUMoney
+✅ Donor leaderboard (monthly/all-time)
+✅ Admin Portal (full CMS + analytics + settings)
+✅ Responsive design, mobile-first
+
+🧮 Fairness Formula
+js
+Copy code
+tickets = base
+        + Math.floor(points / P) * alpha
+        + Math.min(referrals, Rcap) * beta
+        + beta * Math.log2(1 + Math.max(0, referrals - Rcap));
+
+tickets = Math.min(tickets, Tmax);
+if (tickets > ratioCap * medianTickets) tickets = ratioCap * medianTickets;
+tickets += epsilon;
+probability = tickets / totalTickets;
+Defaults:
+base=1, P=50, alpha=1, beta=2, Rcap=20, Tmax=500, ratioCap=5, epsilon=0.0001
+
+🧭 Pages
+Public
+/ — Home (hero + featured giveaways)
+
+/giveaways — Browse giveaways
+
+/g/:gid — Giveaway detail + tasks + chat
+
+/winners — Leaderboards
+
+/support — Donations + leaderboards
+
+/auth/login — Login (Google/Email OTP)
+
+User
+/me — Dashboard (joined giveaways, points, donations)
+
+/me/profile — Edit profile, anonymity toggle
+
+Admin
+/admin — Dashboard KPIs
+
+/admin/giveaways — Manage giveaways
+
+/admin/tasks — Manage tasks
+
+/admin/users — Manage users
+
+/admin/donations — Manage donations
+
+/admin/settings — Domains, SMTP, Fairness, Ads, GA4
+
+/admin/audit — Admin logs
+
+🧪 QA Checklist
+ OTP emails delivered via Hostinger SMTP
+
+ Google login works
+
+ Domain restriction enforced
+
+ Tasks complete once per giveaway
+
+ Referrals credit referrer only if verified
+
+ Auto/manual winner draw functional
+
+ PayUMoney success/fail recorded
+
+ Donations update donor board
+
+ CMS edits reflect live instantly
+
+ All admin actions logged
+
+🧱 Build Commands
+bash
+Copy code
+npm run dev          # Local development
+npm run build        # Build for production
+npm run preview      # Preview locally
+firebase deploy      # Deploy functions + rules
+💡 Deployment
+Build and upload /dist to Hostinger.
+
+Add all environment variables in Hostinger’s control panel.
+
+Deploy Firebase Functions with secrets.
+
+Add your domain in Firebase Authentication allowed domains.
+
+Test SMTP “Send Test Email” from Admin panel.
+
+👑 Admin Capabilities
+Full CRUD on giveaways, users, tasks, donations, settings
+
+Change all site text, images, and templates
+
+Configure SMTP, PayUMoney, fairness, GA4, ads
+
+Manage domain allowlist
+
+Select manual or auto winners
+
+View audit logs of every action
+
+🧭 Build Timeline (Sprints)
+1️⃣ Auth + Firebase setup
+2️⃣ Giveaways + Join + Tasks
+3️⃣ Referrals + Probabilities
+4️⃣ Donations + PayUMoney
+5️⃣ Winners (auto/manual)
+6️⃣ Admin Panel + CMS
+7️⃣ QA + Deployment
+
+🪪 License
+© 2025 GiveawayConnect. All rights reserved.
