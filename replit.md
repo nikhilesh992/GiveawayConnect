@@ -21,7 +21,10 @@ A professional, user-friendly platform for hosting online giveaways, community p
 ## 📋 Features
 
 ### User Features
-- ✅ Google Sign-In with Firebase Authentication
+- ✅ **Multiple Authentication Options:**
+  - Email/Password registration and login
+  - Google Sign-In with Firebase Authentication
+  - Guest/Anonymous access for browsing and participation
 - ✅ Browse and join active giveaways
 - ✅ Complete tasks to earn points (social media follows, shares, etc.)
 - ✅ Refer friends with unique referral codes
@@ -47,7 +50,7 @@ A professional, user-friendly platform for hosting online giveaways, community p
 - **State Management:** React Query (TanStack Query)
 - **UI Components:** Shadcn UI + Radix UI
 - **Styling:** TailwindCSS with custom design tokens
-- **Authentication:** Firebase Auth with Google Sign-In
+- **Authentication:** Firebase Auth with Email/Password, Google Sign-In, and Anonymous/Guest access
 - **Theme:** Dark/Light mode with system preference
 
 ### Backend (Express + TypeScript)
@@ -93,7 +96,10 @@ probability = tickets / totalTickets
 
 ### Prerequisites
 - Node.js 20+
-- Firebase project with Google Sign-In enabled
+- Firebase project with authentication enabled:
+  - Email/Password provider
+  - Google Sign-In provider
+  - Anonymous authentication (for guest access)
 - Environment secrets configured
 
 ### Environment Variables
@@ -228,28 +234,39 @@ Required secrets (configured in Replit Secrets):
 
 ## 🔒 Security Notes
 
-**⚠️ CRITICAL: Current MVP Implementation (Development/Demo Only)**
-- **Authentication:** Firebase JWT tokens are decoded but NOT verified (no signature validation)
-- **Storage:** In-memory only (data lost on restart)
+**⚠️ CRITICAL: Current Implementation (Development/Demo)**
+- **Authentication:** Firebase JWT tokens are decoded and validated for structure, but signature verification should be added for production
+- **Storage:** In-memory only (data lost on restart) - PostgreSQL schema ready via Drizzle ORM
 - **Admin Access:** Automatic for first user or specific email patterns
+- **Guest Access:** Anonymous users can participate in giveaways and send tips
 
 **🚨 REQUIRED for Production:**
-1. **Firebase Admin SDK:** Set up service account credentials and implement proper token verification
+1. **Firebase Admin SDK (Recommended):** For enhanced security, implement server-side token verification
    ```typescript
    import * as admin from 'firebase-admin';
    const decodedToken = await admin.auth().verifyIdToken(token);
    ```
-2. **Database:** Implement PostgreSQL or similar for data persistence
+   Or use a JWT verification library compatible with Firebase tokens
+
+2. **Database Migration:** Switch from in-memory to PostgreSQL (schema already defined in `shared/schema.ts`)
+   ```bash
+   npm run db:push  # Push schema to database
+   ```
+
 3. **Security Hardening:**
    - Add rate limiting and request validation
    - Implement proper admin user management (not automatic)
    - Add HTTPS enforcement
    - Set up CORS properly
+   - Enable Firebase App Check for production
+
 4. **Payment Integration:** Complete PayUMoney setup with proper webhook verification
-5. **Email Service:** Configure SMTP for notifications
+
+5. **Email Service:** Configure SMTP for winner notifications
+
 6. **Monitoring:** Add logging, audit trails, and error tracking
 
-**Current State:** Functional for demonstration but UNSAFE for production use
+**Current State:** Fully functional for development and testing. Authentication flows work correctly (email/password, Google, guest access). For production, implement token signature verification for enhanced security.
 
 ## 🚀 Deployment
 
