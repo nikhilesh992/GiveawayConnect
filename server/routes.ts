@@ -129,17 +129,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!user) {
         // Create new user
-        // For MVP: Make first user or users with admin email patterns admins
-        const allUsers = await storage.getAllUsers();
-        const isFirstUser = allUsers.length === 0;
-        const isAdminEmail = req.user!.email.includes('admin') || req.user!.email.endsWith('@giveawayconnect.com');
+        // Note: Admin access must be granted manually through database
+        // Only specific email domain gets automatic admin access
+        const isAdminEmail = req.user!.email.endsWith('@giveawayconnect.com');
         
         user = await storage.createUser({
           firebaseUid: req.user!.uid,
           email: req.user!.email,
           displayName: req.user!.name,
           photoURL: req.user?.picture,
-          isAdmin: isFirstUser || isAdminEmail,
+          isAdmin: isAdminEmail,
         });
       }
 

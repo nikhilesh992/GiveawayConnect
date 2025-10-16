@@ -281,13 +281,12 @@ The app is ready to be published on Replit. The frontend and backend run on the 
 - [ ] Set up database for data persistence
 - [ ] Configure admin users
 
-### Admin Access (MVP)
-For the MVP, admin access is granted to:
-- The first user to sign in (automatically becomes admin)
-- Any user with 'admin' in their email address
-- Any user with @giveawayconnect.com email domain
+### Admin Access
+Admin access is granted to:
+- Users with @giveawayconnect.com email domain (automatic)
+- Other users must be granted admin access manually through the database
 
-In production, implement proper admin management through database flags.
+To manually grant admin access, update the `isAdmin` field in the users table.
 
 ## 📝 Future Enhancements
 
