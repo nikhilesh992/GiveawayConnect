@@ -22,10 +22,10 @@ export default function Support() {
   });
 
   const donateMutation = useMutation({
-    mutationFn: (data: { amount: number; isAnonymous: boolean; message: string }) =>
+    mutationFn: (data: { amount: number; isAnonymous: boolean; message: string; donorEmail: string; donorName: string }) =>
       apiRequest("POST", "/api/donations", data),
     onSuccess: (data: any) => {
-      // Redirect to PayUMoney payment page
+      // Redirect to PayU payment page
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl;
       } else {
@@ -63,31 +63,14 @@ export default function Support() {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Donation Form */}
           <div>
-            {user ? (
-              <DonateForm
-                onSubmit={(amount, isAnonymous, message) =>
-                  donateMutation.mutateAsync({ amount, isAnonymous, message })
-                }
-                isPending={donateMutation.isPending}
-              />
-            ) : (
-              <Card className="border-primary/20">
-                <CardContent className="py-12 text-center space-y-4">
-                  <Heart className="h-12 w-12 text-red-500 fill-current mx-auto" />
-                  <div>
-                    <h3 className="text-xl font-bold mb-2">Sign in to Donate</h3>
-                    <p className="text-muted-foreground">
-                      Please sign in to support the community with a donation
-                    </p>
-                  </div>
-                  <a href="/login">
-                    <button className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background bg-primary text-primary-foreground hover:bg-primary/90 h-10 py-2 px-4">
-                      Sign In
-                    </button>
-                  </a>
-                </CardContent>
-              </Card>
-            )}
+            <DonateForm
+              onSubmit={(amount, isAnonymous, message, donorEmail, donorName) =>
+                donateMutation.mutateAsync({ amount, isAnonymous, message, donorEmail, donorName })
+              }
+              isPending={donateMutation.isPending}
+              userEmail={user?.email}
+              userName={user?.displayName}
+            />
 
             {/* Impact Card */}
             <Card className="mt-6 border-emerald-500/20 bg-gradient-to-br from-emerald-500/5 to-background">

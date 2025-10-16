@@ -11,15 +11,19 @@ import { useToast } from "@/hooks/use-toast";
 const PRESET_AMOUNTS = [100, 500, 1000, 2500, 5000];
 
 interface DonateFormProps {
-  onSubmit: (amount: number, isAnonymous: boolean, message: string) => Promise<void>;
+  onSubmit: (amount: number, isAnonymous: boolean, message: string, donorEmail: string, donorName: string) => Promise<void>;
   isPending: boolean;
+  userEmail?: string;
+  userName?: string;
 }
 
-export function DonateForm({ onSubmit, isPending }: DonateFormProps) {
+export function DonateForm({ onSubmit, isPending, userEmail, userName }: DonateFormProps) {
   const [amount, setAmount] = useState<number>(500);
   const [customAmount, setCustomAmount] = useState<string>("");
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [message, setMessage] = useState("");
+  const [donorEmail, setDonorEmail] = useState(userEmail || "");
+  const [donorName, setDonorName] = useState(userName || "");
   const { toast } = useToast();
 
   const handlePresetClick = (preset: number) => {
@@ -38,16 +42,25 @@ export function DonateForm({ onSubmit, isPending }: DonateFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (amount < 10) {
+    if (amount < 1) {
       toast({
         title: "Invalid amount",
-        description: "Minimum donation amount is ₹10",
+        description: "Minimum donation amount is ₹1",
         variant: "destructive",
       });
       return;
     }
 
-    await onSubmit(amount, isAnonymous, message);
+    if (!donorEmail || !donorName) {
+      toast({
+        title: "Required fields",
+        description: "Please provide your email and name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    await onSubmit(amount, isAnonymous, message, donorEmail, donorName);
   };
 
   return (
@@ -63,6 +76,34 @@ export function DonateForm({ onSubmit, isPending }: DonateFormProps) {
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Donor Information */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="donor-name">Your Name *</Label>
+              <Input
+                id="donor-name"
+                type="text"
+                placeholder="Enter your name"
+                value={donorName}
+                onChange={(e) => setDonorName(e.target.value)}
+                required
+                data-testid="input-donor-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="donor-email">Your Email *</Label>
+              <Input
+                id="donor-email"
+                type="email"
+                placeholder="Enter your email"
+                value={donorEmail}
+                onChange={(e) => setDonorEmail(e.target.value)}
+                required
+                data-testid="input-donor-email"
+              />
+            </div>
+          </div>
+
           {/* Preset Amounts */}
           <div className="space-y-2">
             <Label>Select Amount</Label>
@@ -90,9 +131,9 @@ export function DonateForm({ onSubmit, isPending }: DonateFormProps) {
               <Input
                 id="custom-amount"
                 type="number"
-                min="10"
+                min="1"
                 step="1"
-                placeholder="Enter amount"
+                placeholder="Enter amount (minimum ₹1)"
                 value={customAmount}
                 onChange={(e) => handleCustomAmountChange(e.target.value)}
                 className="pl-9 font-mono"
@@ -152,7 +193,7 @@ export function DonateForm({ onSubmit, isPending }: DonateFormProps) {
             type="submit"
             size="lg"
             className="w-full hover-elevate active-elevate-2"
-            disabled={isPending || amount < 10}
+            disabled={isPending || amount < 1}
             data-testid="button-donate-submit"
           >
             {isPending ? (
